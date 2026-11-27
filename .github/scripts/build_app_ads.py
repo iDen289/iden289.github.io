@@ -1,10 +1,11 @@
 """Сборка app-ads.txt iDen Games (GitHub Actions, раз в сутки; только stdlib).
 
 Разделы по порядку: sources/own.txt (AdMob студии), строки CAS с https://cas.ai/app-ads.txt (CAS держит их
-актуальными), sources/yandex.txt (РСЯ / Yandex Mobile Ads), sources/legacy.txt (прежние строки файла — не теряем).
-Строки, пропавшие из источников (CAS убирает их из своего списка), остаются в разделе legacy самого app-ads.txt.
+актуальными), sources/yandex.txt (РСЯ / Yandex Mobile Ads). Других строк в файле нет.
+Строка, убранная из всех источников (например, CAS вычеркнул её из своего списка), уходит и из app-ads.txt.
 Дубли убираются, чужие директивы (OwnerDomain=, ManagerDomain=, CONTACT=…) выкидываются — файл наш.
-Защита: если CAS недоступен или отдал подозрительно мало строк — выходим с ошибкой и файл НЕ меняется.
+Защита: CAS недоступен, отдал подозрительно мало строк или разом пропало больше MAX_LOST записей — выходим
+с ошибкой и файл НЕ меняется.
 Источник правил — factory/registry/app_ads/ (фабрика iDen Games); sources/*.txt синхронизирует фабрика.
 """
 import datetime as dt
@@ -16,6 +17,7 @@ import urllib.request
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 CAS_URL = "https://cas.ai/app-ads.txt"
 MIN_CAS = 3000  # меньше — значит, что-то не так с ответом CAS
+MAX_LOST = 500  # больше пропавших за раз — похоже на обрезанный список, нужна проверка человеком
 DIRECTIVE = re.compile(r"^\s*[A-Za-z]+\s*=")
 
 
@@ -54,8 +56,7 @@ def main():
     path = os.path.join(ROOT, "app-ads.txt")
     old = open(path, encoding="utf-8").read() if os.path.exists(path) else ""
     sections = [("own (AdMob iDen Games)", records(read("own.txt"))), (f"cas ({CAS_URL})", cas_recs),
-                ("yandex (РСЯ / Yandex Mobile Ads)", records(read("yandex.txt"))),
-                ("legacy (прежние строки файла)", records(read("legacy.txt")) + records(old))]
+                ("yandex (РСЯ / Yandex Mobile Ads)", records(read("yandex.txt")))]
     seen, body = set(), []
     for name, recs in sections:
         # seen.add возвращает None: условие заодно запоминает строку и убирает дубли внутри раздела
@@ -68,8 +69,10 @@ def main():
         print(f"без изменений: {len(seen)} записей")
         return
     lost = set(x.lower() for x in records(old)) - seen
-    if lost:  # страховка: не должно случаться, прежний файл целиком входит в legacy
-        sys.exit(f"новый файл потерял бы {len(lost)} прежних записей — не меняю")
+    if len(lost) > MAX_LOST:
+        sys.exit(f"новый файл потерял бы {len(lost)} прежних записей (> {MAX_LOST}) — не меняю")
+    for x in sorted(lost):
+        print("убрана:", x)
     with open(path, "w", encoding="utf-8") as f:
         f.write(text)
     print(f"обновлён {dt.date.today()}: {len(seen)} записей")
