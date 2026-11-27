@@ -3,7 +3,7 @@
 Разделы по порядку: sources/own.txt (AdMob студии), строки CAS с https://cas.ai/app-ads.txt (CAS держит их
 актуальными), sources/yandex.txt (РСЯ / Yandex Mobile Ads). Других строк в файле нет.
 Строка, убранная из всех источников (например, CAS вычеркнул её из своего списка), уходит и из app-ads.txt.
-Дубли убираются, чужие директивы (OwnerDomain=, ManagerDomain=, CONTACT=…) выкидываются — файл наш.
+Дубли убираются. Из директив CAS переносятся inventorypartnerdomain=; OwnerDomain=, ManagerDomain=, CONTACT=\nвыкидываются — они объявляют владельца файла, а файл наш.
 Защита: CAS недоступен, отдал подозрительно мало строк или разом пропало больше MAX_LOST записей — выходим
 с ошибкой и файл НЕ меняется.
 Источник правил — factory/registry/app_ads/ (фабрика iDen Games); sources/*.txt синхронизирует фабрика.
@@ -19,6 +19,7 @@ CAS_URL = "https://cas.ai/app-ads.txt"
 MIN_CAS = 3000  # меньше — значит, что-то не так с ответом CAS
 MAX_LOST = 500  # больше пропавших за раз — похоже на обрезанный список, нужна проверка человеком
 DIRECTIVE = re.compile(r"^\s*[A-Za-z]+\s*=")
+PARTNER = re.compile(r"^[ \t]*inventorypartnerdomain[ \t]*=[ \t]*([^\s#,]+)", re.I | re.M)
 
 
 def norm(line):
@@ -36,6 +37,10 @@ def norm(line):
 
 def records(text):
     return [k for k in (norm(l) for l in text.splitlines()) if k]
+
+
+def partners(text):
+    return list(dict.fromkeys("inventorypartnerdomain=" + d.lower() for d in PARTNER.findall(text)))
 
 
 def read(name):
@@ -58,6 +63,8 @@ def main():
     sections = [("own (AdMob iDen Games)", records(read("own.txt"))), (f"cas ({CAS_URL})", cas_recs),
                 ("yandex (РСЯ / Yandex Mobile Ads)", records(read("yandex.txt")))]
     seen, body = set(), []
+    if partners(cas):
+        body += ["", "#=== директивы CAS"] + partners(cas)
     for name, recs in sections:
         # seen.add возвращает None: условие заодно запоминает строку и убирает дубли внутри раздела
         recs = [x for x in recs if not (x.lower() in seen or seen.add(x.lower()))]
@@ -65,7 +72,7 @@ def main():
     head = ["# app-ads.txt iDen Games — обновляется автоматически раз в сутки (.github/workflows/app-ads.yml)",
             "# Не править руками: источники — sources/*.txt и " + CAS_URL]
     text = "\n".join(head + body) + "\n"
-    if set(records(old)) == set(records(text)):
+    if set(records(old)) == set(records(text)) and set(partners(old)) == set(partners(text)):
         print(f"без изменений: {len(seen)} записей")
         return
     lost = set(x.lower() for x in records(old)) - seen
