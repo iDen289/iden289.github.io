@@ -1,6 +1,12 @@
 # app-ads.txt iDen Games — обновляется автоматически раз в сутки (.github/workflows/app-ads.yml)
 # Не править руками: источники — sources/*.txt и https://cas.ai/app-ads.txt
 
+#=== директивы CAS
+inventorypartnerdomain=streamix-tv.com
+inventorypartnerdomain=voisetech.com
+inventorypartnerdomain=monetrix.ai
+inventorypartnerdomain=gadsme.com
+
 #=== own (AdMob iDen Games) — 3
 google.com, pub-6605451394844401, DIRECT, f08c47fec0942fa0
 google.com, pub-9966962268328280, DIRECT, f08c47fec0942fa0
