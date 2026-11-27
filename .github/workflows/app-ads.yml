@@ -12,7 +12,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - name: Собрать app-ads.txt (CAS + РСЯ + AdMob + прежние строки)
+      - name: Собрать app-ads.txt (CAS + РСЯ + AdMob)
         run: python3 .github/scripts/build_app_ads.py
       - name: Закоммитить, если изменился
         run: |
